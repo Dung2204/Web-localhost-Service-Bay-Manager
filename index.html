@@ -26,9 +26,6 @@
   </script>
 
   <style>
-    html, body{
-      height: 100%;
-    }
     /* Backdrop cho Modal */
     .modal-backdrop {
       background-color: rgba(15, 23, 42, 0.6);
@@ -69,19 +66,7 @@
   <script type="text/babel">
     
     const { useState, useEffect, useMemo, useCallback } = React;
-    
-    // =========================================================================================
-    // ✅ KHU VỰC CẤU HÌNH API ĐÃ SỬA ĐỔI
-    // =========================================================================================
-    // 🛑 BẠN PHẢI THAY THẾ CHUỖI NÀY BẰNG URL BACK-END (FLASK) THỰC TẾ CỦA BẠN TRÊN RENDER
-    const PRODUCTION_API_URL = "https://your-backend-service-name.onrender.com"; 
-    const LOCAL_API_URL = "http://127.0.0.1:5000";
-
-    // Tự động chọn URL: Dùng Localhost khi dev, dùng Production URL khi deploy lên Render
-    const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? LOCAL_API_URL 
-        : PRODUCTION_API_URL;
-    // =========================================================================================
+    const API_URL = ""; // ĐÃ SỬA: Thay thế "http://127.0.0.1:5000" bằng chuỗi rỗng để sử dụng đường dẫn tương đối.
 
     // --- ICONS SVG ---
     const Icons = {
@@ -586,7 +571,7 @@
                             <label className="block text-[10px] uppercase font-bold text-slate-400">Ngày làm việc</label>
                             <input type="date" value={filterDate} onChange={(e) => onDateChange(e.target.value)} className="bg-transparent text-sm font-medium text-slate-700 outline-none" />
                         </div>
-                        </div>
+                    </div>
                     <div className="h-8 w-px bg-slate-200"></div>
                     <div className="flex items-center gap-2">
                         <div>
@@ -1040,4 +1025,3 @@
       </script>
 </body>
 </html>
-
