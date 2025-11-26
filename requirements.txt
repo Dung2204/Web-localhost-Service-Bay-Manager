@@ -2,3 +2,4 @@ flask
 flask-cors
 gspread
 oauth2client
+gunicorn
