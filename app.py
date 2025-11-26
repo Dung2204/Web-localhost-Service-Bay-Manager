@@ -26,18 +26,17 @@ SHEET_NAME = "ServiceAppDB"
 sheet_tasks = None
 sheet_users = None
 
-# Danh sách KTV (Cần thiết cho logic chọn Bay tiếp theo)
 BAYS_TECHNICIANS_LIST = [
-    {'id': 'bay_1', 'name': 'Khoang 1', 'technician': 'Lê Minh An'},
-    {'id': 'bay_2', 'name': 'Khoang 2', 'technician': 'Trần Khánh Vy'},
-    {'id': 'bay_3', 'name': 'Khoang 3', 'technician': 'Phạm Hoàng Nam'},
-    {'id': 'bay_4', 'name': 'Khoang 4', 'technician': 'Nguyễn Thị Ngọc Anh'},
-    {'id': 'bay_5', 'name': 'Khoang 5', 'technician': 'Huỳnh Tuấn Kiệt'},
-    {'id': 'bay_6', 'name': 'Khoang 6', 'technician': 'Đỗ Phương Thảo'},
-    {'id': 'bay_7', 'name': 'Khoang 7', 'technician': 'Lương Quang Huy'},
-    {'id': 'bay_8', 'name': 'Khoang 8', 'technician': 'Đặng Thùy Linh'},
-    {'id': 'bay_9', 'name': 'Khoang 9', 'technician': 'Trịnh Văn Đạt'},
-    {'id': 'bay_10', 'name': 'Khoang 10', 'technician': 'Bùi Thị Kim Ngân'},
+    {'id': 'bay_1', 'name': 'Khoang 1', 'technician': 'Lê Minh An'},
+    {'id': 'bay_2', 'name': 'Khoang 2', 'technician': 'Trần Khánh Vy'},
+    {'id': 'bay_3', 'name': 'Khoang 3', 'technician': 'Phạm Hoàng Nam'},
+    {'id': 'bay_4', 'name': 'Khoang 4', 'technician': 'Nguyễn Thị Ngọc Anh'},
+    {'id': 'bay_5', 'name': 'Khoang 5', 'technician': 'Huỳnh Tuấn Kiệt'},
+    {'id': 'bay_6', 'name': 'Khoang 6', 'technician': 'Đỗ Phương Thảo'},
+    {'id': 'bay_7', 'name': 'Khoang 7', 'technician': 'Lương Quang Huy'},
+    {'id': 'bay_8', 'name': 'Khoang 8', 'technician': 'Đặng Thùy Linh'},
+    {'id': 'bay_9', 'name': 'Khoang 9', 'technician': 'Trịnh Văn Đạt'},
+    {'id': 'bay_10', 'name': 'Khoang 10', 'technician': 'Bùi Thị Kim Ngân'},
 ]
 # Tạo danh sách ID theo thứ tự để quay vòng
 BAY_IDS_ORDER = [bay['id'] for bay in BAYS_TECHNICIANS_LIST]
@@ -784,3 +783,4 @@ if __name__ == '__main__':
     # Sử dụng gunicorn khi triển khai Render, nhưng để đảm bảo tính chạy cục bộ
     # tôi sẽ giữ app.run, nhưng lưu ý khi triển khai Render nên dùng gunicorn
     app.run(debug=True, host='0.0.0.0', port=port)
+
