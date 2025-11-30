@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Service Bay Manager Pro</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script>
+    // Khối cấu hình Tailwind
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+            surface: '#f8fafc', // Màu nền tùy chỉnh
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Backdrop cho Modal */
+    .modal-backdrop {
+      background-color: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+    }
+    
+    /* Tùy chỉnh thanh cuộn (Scrollbar) - GIỮ LẠI CHO TRÌNH DUYỆT CÓ HỖ TRỢ */
+    /* Lưu ý: Đây là cú pháp không chuẩn, nhưng cần giữ nếu bạn muốn hiệu ứng này trên Chrome/Safari */
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 9999px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+    
+    /* Hiệu ứng kính mờ cho Panel - Tối ưu hóa cho Tailwind */
+    .glass-panel {
+      background-color: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    
+    /* DỰ PHÒNG: Nếu muốn animation nhanh hơn, bạn có thể dùng keyframes chuẩn */
+    /* @keyframes pulse-soft { ... } */
+    /* NHƯNG TÔI SẼ THAY THẾ BẰNG CLASS CHUẨN CỦA TAILWIND (animate-pulse) TRONG JSX */
+  </style>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+
+<body class="bg-surface text-slate-800 antialiased min-h-screen flex flex-col font-sans">
+  
+  <div id="root" class="flex-grow flex flex-col"></div>
+  
+  <script type="text/babel">
+    
+    const { useState, useEffect, useMemo, useCallback } = React;
+    const API_URL = "http://127.0.0.1:5000";
+
+    // --- ICONS SVG ---
+    const Icons = {
+        Car: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>,
+        Calendar: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+        History: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        Chart: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+        Users: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+        Logout: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
+        Plus: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+        Search: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+        Money: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+    };
+
+    // --- UTILS ---
+    const isToday = (someDate) => {
+        if (!someDate) return false;
+        const today = new Date();
+        const dateToTest = new Date(someDate);
+        return dateToTest.getDate() == today.getDate() &&
+            dateToTest.getMonth() == today.getMonth() &&
+            dateToTest.getFullYear() == today.getFullYear();
+    };
+    
+    const formatDateTimeLocal = (date) => {
+        if (!date) return '';
+        try {
+            const d = new Date(date);
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            return d.toISOString().slice(0, 16);
+        } catch (e) { return ''; }
+    }
+    
+    const formatDateTimeVN = (date) => {
+        if (!date) return 'N/A';
+        try {
+            const d = new Date(date);
+            return d.toLocaleString('vi-VN', { 
+                day: '2-digit', month: '2-digit', year: 'numeric', 
+                hour: '2-digit', minute: '2-digit' 
+            });
+        } catch(e) { return 'Invalid Date'; }
+    };
+
+    const formatCurrency = (amount) => {
+        if (!amount) return '0 đ';
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    };
+    
+    const getTodayString = () => new Date().toISOString().split('T')[0];
+
+    // --- CONFIG ---
+    const STATUSES = {
+      'hen': { text: 'Hẹn', color: 'bg-rose-100 border-rose-200', textColor: 'text-rose-700' },
+      'cho_sua_chua': { text: 'Chờ sửa chữa', color: 'bg-slate-100 border-slate-200', textColor: 'text-slate-600' },
+      'da_giao_ktv': { text: 'Đã giao KTV', color: 'bg-amber-100 border-amber-200', textColor: 'text-amber-700' },
+      'dang_lam': { text: 'Đang làm', color: 'bg-indigo-100 border-indigo-200', textColor: 'text-indigo-700' },
+      'hoan_thanh_sc': { text: 'Hoàn thành SC', color: 'bg-emerald-100 border-emerald-200', textColor: 'text-emerald-700' },
+      'xoa_xe': { text: 'Rửa xe', color: 'bg-cyan-100 border-cyan-200', textColor: 'text-cyan-700' },
+      'san_sang_giao_xe': { text: 'Sẵn sàng giao', color: 'bg-lime-100 border-lime-200', textColor: 'text-lime-700' },
+    };
+
+    const BAYS_TECHNICIANS = [
+      { id: 'bay_1', name: 'Khoang 1', technician: 'Lê Minh An' },
+      { id: 'bay_2', name: 'Khoang 2', technician: 'Trần Khánh Vy' },
+      { id: 'bay_3', name: 'Khoang 3', technician: 'Phạm Hoàng Nam' },
+      { id: 'bay_4', name: 'Khoang 4', technician: 'Nguyễn Thị Ngọc Anh' },
+      { id: 'bay_5', name: 'Khoang 5', technician: 'Huỳnh Tuấn Kiệt' },
+      { id: 'bay_6', name: 'Khoang 6', technician: 'Đỗ Phương Thảo' },
+      { id: 'bay_7', name: 'Khoang 7', technician: 'Lương Quang Huy' },
+      { id: 'bay_8', name: 'Khoang 8', technician: 'Đặng Thùy Linh' },
+      { id: 'bay_9', name: 'Khoang 9', technician: 'Trịnh Văn Đạt' },
+      { id: 'bay_10', name: 'Khoang 10', technician: 'Bùi Thị Kim Ngân' },
+    ];
+    
+    // --- COMPONENT: INPUT FIELD (Tái sử dụng) ---
+    const InputField = ({ label, ...props }) => (
+        <div className="mb-4">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{label}</label>
+            <input 
+                {...props}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all shadow-sm"
+            />
+        </div>
+    );
+
+    // --- 1. COMPONENT ĐĂNG NHẬP ---
+    function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
+      const [userId, setUserId] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        setLoading(true); setError('');
+        
+        fetch(`${API_URL}/api/login`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, password })
+        })
+        .then(res => res.json().then(data => ({ status: res.status, body: data })))
+        .then(({ status, body }) => {
+          if (status === 200) onLoginSuccess(body);
+          else setError(body.error || 'Lỗi không xác định');
+        })
+        .catch(err => setError('Không thể kết nối đến máy chủ.'))
+        .finally(() => setLoading(false));
+      };
+
+      return (
+        <div className="flex items-center justify-center flex-grow bg-gradient-to-br from-primary-50 to-white font-sans p-4">
+          <div className="w-full max-w-md p-8 glass-panel rounded-2xl">
+            <div className="text-center mb-8">
+                <div className="mx-auto w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center text-white mb-4 shadow-lg shadow-primary-500/30">
+                    <Icons.Car />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800">Đăng Nhập</h2>
+                <p className="text-slate-500 text-sm mt-1">Hệ thống quản lý dịch vụ chuyên nghiệp</p>
+            </div>
+            
+            <form className="space-y-4" onSubmit={handleLogin}>
+              <InputField label="Tên đăng nhập" type="text" required value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="Nhập ID của bạn" />
+              <InputField label="Mật khẩu" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+              
+              {error && <div className="p-3 text-sm text-center text-red-600 bg-red-50 rounded-lg border border-red-100">{error}</div>}
+              
+              <button type="submit" disabled={loading} className="w-full py-3 text-sm font-semibold text-white bg-primary-600 rounded-lg shadow-lg shadow-primary-500/30 hover:bg-primary-700 hover:shadow-primary-600/40 transition-all transform hover:-translate-y-0.5 disabled:opacity-70 disabled:transform-none">
+                {loading ? 'Đang xác thực...' : 'Truy cập hệ thống'}
+              </button>
+              
+              <p className="text-sm text-center text-slate-500 pt-2">
+                Chưa có tài khoản? 
+                <button type="button" onClick={onSwitchToRegister} className="ml-1 font-semibold text-primary-600 hover:underline">Đăng ký ngay</button>
+              </p>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // --- 2. COMPONENT ĐĂNG KÝ ---
+    function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
+      const [formData, setFormData] = useState({ userId: '', password: '', hoTen: '', ngaySinh: '', sdt: '', gmail: '', diaChi: '', role: 'user' });
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+      const handleRegister = (e) => {
+        e.preventDefault();
+        setLoading(true); setError('');
+        if (formData.password.length < 4) { setError('Mật khẩu phải có ít nhất 4 ký tự.'); setLoading(false); return; }
+
+        fetch(`${API_URL}/api/register`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        })
+        .then(res => res.json().then(data => ({ status: res.status, body: data })))
+        .then(({ status, body }) => {
+          if (status === 201) onRegisterSuccess(body);
+          else setError(body.error || 'Lỗi không xác định');
+        })
+        .catch(err => setError('Không thể kết nối đến máy chủ.'))
+        .finally(() => setLoading(false));
+      };
+
+      return (
+        <div className="flex items-center justify-center flex-grow bg-gradient-to-br from-primary-50 to-white font-sans py-12 px-4">
+          <div className="w-full max-w-2xl p-8 glass-panel rounded-2xl">
+            <h2 className="text-2xl font-bold text-center text-slate-800 mb-6">Tạo Tài Khoản Mới</h2>
+            <form className="space-y-5" onSubmit={handleRegister}>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <InputField label="Tên đăng nhập *" name="userId" required onChange={handleChange} />
+                <InputField label="Mật khẩu *" name="password" type="password" required onChange={handleChange} />
+                <InputField label="Họ và Tên *" name="hoTen" required onChange={handleChange} />
+                <InputField label="Số điện thoại *" name="sdt" type="tel" required onChange={handleChange} />
+                <InputField label="Ngày sinh" name="ngaySinh" type="date" onChange={handleChange} />
+                <InputField label="Email" name="gmail" type="email" onChange={handleChange} />
+              </div>
+              <InputField label="Địa chỉ" name="diaChi" onChange={handleChange} />
+              
+              {error && <div className="p-3 text-sm text-center text-red-600 bg-red-50 rounded-lg">{error}</div>}
+              
+              <div className="pt-2">
+                <button type="submit" disabled={loading} className="w-full py-3 text-sm font-semibold text-white bg-primary-600 rounded-lg shadow-lg shadow-primary-500/30 hover:bg-primary-700 transition-all">
+                  {loading ? 'Đang xử lý...' : 'Hoàn tất đăng ký'}
+                </button>
+              </div>
+              <p className="text-sm text-center text-slate-500">
+                Đã có tài khoản? 
+                <button type="button" onClick={onSwitchToLogin} className="ml-1 font-semibold text-primary-600 hover:underline">Đăng nhập</button>
+              </p>
+            </form>
+          </div>
+        </div>
+      );
+    }
+    
+    // --- COMPONENT MODAL THANH TOÁN ---
+    function PaymentModal({ isOpen, onClose, task, onConfirm }) {
+        const [amount, setAmount] = useState('');
+        useEffect(() => { if (isOpen) setAmount(''); }, [isOpen, task]);
+
+        if (!isOpen || !task) return null;
+        const bayInfo = BAYS_TECHNICIANS.find(b => b.id === task.bayId);
+        const techName = bayInfo ? bayInfo.technician : 'Chưa phân công';
+
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
+                    <div className="bg-emerald-600 p-4 flex justify-between items-center text-white">
+                        <div className="flex items-center gap-2 font-bold text-lg"><Icons.Money /> Xác nhận thanh toán</div>
+                        <button onClick={onClose} className="text-white/80 hover:text-white">&times;</button>
+                    </div>
+                    
+                    <div className="p-6 space-y-4">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm space-y-2">
+                            <div className="flex justify-between border-b border-slate-200 pb-2">
+                                <span className="text-slate-500">Biển số:</span>
+                                <span className="font-bold text-lg text-primary-700">{task.licensePlate}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Khách hàng:</span>
+                                <span className="font-medium">{task.customerName}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Dịch vụ:</span>
+                                <span className="font-medium text-right max-w-[150px] truncate">{task.serviceDetails}</span>
+                            </div>
+                            <div className="pt-2 text-xs text-slate-400 text-center">
+                                KTV: {techName}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Tổng tiền thực thu (VND):</label>
+                            <input 
+                                type="number" value={amount} onChange={e => setAmount(e.target.value)} 
+                                className="w-full text-3xl font-bold text-center text-emerald-600 border-b-2 border-emerald-200 focus:border-emerald-600 outline-none py-2 bg-transparent placeholder-slate-200"
+                                placeholder="0" autoFocus 
+                            />
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <button onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition">Bỏ qua</button>
+                            <button 
+                                onClick={() => onConfirm(task.id, amount)} 
+                                disabled={!amount}
+                                className="flex-1 py-2.5 rounded-lg bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-500/30 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:transform-none"
+                            >
+                                Thu tiền
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // --- COMPONENT MODAL TẠO/SỬA TASK ---
+    function TaskModal({ isOpen, onClose, user, onTaskCreated, onTaskUpdated, isEditMode, taskToEdit }) {
+      const [formData, setFormData] = useState({});
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+      const isAdmin = user.role === 'admin';
+
+      useEffect(() => {
+        if (isOpen) {
+          if (isEditMode && taskToEdit) {
+            setFormData({
+              ...taskToEdit,
+              startTime: formatDateTimeLocal(taskToEdit.startTime),
+              endTime: formatDateTimeLocal(taskToEdit.endTime)
+            });
+          } else {
+            setFormData({
+              bayId: 'bay_1', status: 'hen', licensePlate: '', customerName: user.hoTen || '',
+              serviceAdv: isAdmin ? user.hoTen : '', serviceDetails: '', startTime: '', endTime: '', adminNotes: ''
+            });
+          }
+          setError('');
+        }
+      }, [isOpen, isEditMode, taskToEdit, user, isAdmin]);
+
+      const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setLoading(true); setError('');
+        const taskPayload = { ...formData, startTime: formData.startTime ? new Date(formData.startTime).toISOString() : null, endTime: formData.endTime ? new Date(formData.endTime).toISOString() : null };
+
+        let url = isEditMode ? `${API_URL}/api/tasks/${taskToEdit.id}` : `${API_URL}/api/tasks`;
+        let method = isEditMode ? 'PUT' : 'POST';
+        
+        if(isEditMode) { taskPayload.currentUserId = user.userId; taskPayload.currentUserRole = user.role; if(isAdmin) taskPayload.adminNotes = formData.adminNotes; }
+        else { taskPayload.userId = user.userId; }
+
+        fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskPayload) })
+        .then(res => res.json().then(data => ({ status: res.status, body: data })))
+        .then(({ status, body }) => {
+          if (status === 200 || status === 201) {
+            isEditMode ? onTaskUpdated(body.data) : onTaskCreated(body);
+            onClose();
+          } else setError(body.error || 'Lỗi không xác định');
+        })
+        .catch(err => setError('Không thể kết nối đến máy chủ.'))
+        .finally(() => setLoading(false));
+      };
+
+      if (!isOpen) return null;
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop p-4">
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100">
+                <h2 className="text-xl font-bold text-slate-800">{isEditMode ? 'Cập Nhật Công Việc' : 'Tạo Lịch Hẹn Mới'}</h2>
+                <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto custom-scrollbar">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <InputField label="Biển số xe *" name="licensePlate" required value={formData.licensePlate || ''} onChange={handleChange} />
+                    <InputField label="Tên khách hàng *" name="customerName" required value={formData.customerName || ''} onChange={handleChange} />
+                    
+                    <div className="mb-4">
+                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Trạng thái *</label>
+                        <select name="status" value={formData.status || 'hen'} onChange={handleChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            {Object.keys(STATUSES).map(key => <option key={key} value={key}>{STATUSES[key].text}</option>)}
+                        </select>
+                    </div>
+                    <div className="mb-4">
+                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Khoang / KTV *</label>
+                        <select name="bayId" value={formData.bayId || 'bay_1'} onChange={handleChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            {BAYS_TECHNICIANS.map(bay => <option key={bay.id} value={bay.id}>{bay.name} - {bay.technician}</option>)}
+                        </select>
+                    </div>
+                    
+                    <InputField label="Cố vấn DV" name="serviceAdv" value={formData.serviceAdv || ''} onChange={handleChange} disabled={!isAdmin && isEditMode} />
+                    <InputField label="Nội dung CV *" name="serviceDetails" required value={formData.serviceDetails || ''} onChange={handleChange} />
+                    
+                    <InputField label="Giờ vào *" name="startTime" type="datetime-local" required value={formData.startTime || ''} onChange={handleChange} />
+                    <InputField label="Giờ ra (Dự kiến) *" name="endTime" type="datetime-local" required value={formData.endTime || ''} onChange={handleChange} />
+                </div>
+                
+                {isAdmin && (
+                    <div className="mb-4">
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Ghi chú Admin</label>
+                    <textarea name="adminNotes" value={formData.adminNotes || ''} onChange={handleChange} className="w-full px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" rows="2"></textarea>
+                    </div>
+                )}
+                
+                {error && <div className="p-3 text-center text-sm text-red-600 bg-red-50 rounded-lg">{error}</div>}
+
+                <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                    <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 font-medium transition">Hủy bỏ</button>
+                    <button type="submit" disabled={loading} className="px-5 py-2.5 text-white bg-primary-600 rounded-lg hover:bg-primary-700 shadow-lg shadow-primary-500/30 font-medium transition disabled:opacity-50">
+                    {loading ? 'Đang lưu...' : (isEditMode ? 'Lưu thay đổi' : 'Tạo mới')}
+                    </button>
+                </div>
+                </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TRANG TRA CỨU LỊCH SỬ ---
+    function AdminHistoryPage({ user }) {
+        const [query, setQuery] = useState('');
+        const [results, setResults] = useState([]);
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
+        const [hasSearched, setHasSearched] = useState(false);
+
+        const handleSearch = (e) => {
+            e.preventDefault(); if (!query.trim()) return;
+            setLoading(true); setError(''); setHasSearched(true); setResults([]);
+            fetch(`${API_URL}/api/search_history?userId=${user.userId}&query=${encodeURIComponent(query)}`)
+                .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                .then(({ status, body }) => { status === 200 ? setResults(body) : setError(body.error || 'Lỗi'); })
+                .catch(err => setError('Lỗi kết nối'))
+                .finally(() => setLoading(false));
+        };
+
+        return (
+            <div className="space-y-6 animate-fade-in">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><Icons.Search /> Tra Cứu Lịch Sử</h2>
+                    <form onSubmit={handleSearch} className="flex gap-3">
+                        <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nhập biển số xe hoặc tên khách..." className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition" />
+                        <button type="submit" disabled={loading || !query.trim()} className="px-6 py-3 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 transition disabled:opacity-50 shadow-lg shadow-primary-500/20">{loading ? '...' : 'Tìm'}</button>
+                    </form>
+                </div>
+
+                {error && <div className="p-4 text-red-700 bg-red-50 rounded-xl border border-red-100">{error}</div>}
+                {hasSearched && !loading && results.length === 0 && !error && <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">Không tìm thấy kết quả nào.</div>}
+
+                {results.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <table className="min-w-full divide-y divide-slate-100">
+                            <thead className="bg-slate-50/50">
+                                <tr>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Ngày</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Xe / Khách</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Nội dung</th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Thời gian</th>
+                                    <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase">Doanh thu</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {results.map((task, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                                        <td className="px-6 py-4 text-sm text-slate-600">{formatDateTimeVN(task.startTime).split(' ')[1]}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-bold text-primary-700">{task.licensePlate}</div>
+                                            <div className="text-xs text-slate-500">{task.customerName}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-600">{task.serviceDetails}</td>
+                                        <td className="px-6 py-4 text-xs text-slate-500">
+                                            In: {formatDateTimeVN(task.startTime)}<br/>
+                                            Out: <span className="font-medium text-slate-700">{formatDateTimeVN(task.endTime)}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm font-bold text-emerald-600 text-right">{formatCurrency(task.revenue)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        );
+    }
+    
+    // --- COMPONENT HEADER ---
+    function AppHeader({ user, onLogout, page, setPage }) {
+      const isAdmin = user && user.role === 'admin';
+      const navItems = [{ id: 'timeline', name: 'Tiến độ', icon: Icons.Chart }, { id: 'appointments', name: 'Lịch hẹn', icon: Icons.Calendar }];
+      if (isAdmin) {
+        navItems.push({ id: 'history', name: 'Tra cứu', icon: Icons.History });
+        navItems.push({ id: 'staff', name: 'Nhân sự', icon: Icons.Users });
+        navItems.push({ id: 'reports', name: 'Báo cáo', icon: Icons.Chart });
+      }
+      return (
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3 mx-auto max-w-screen-2xl sm:px-6 lg:px-8">
+            <div className="flex items-center gap-8">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white shadow-md shadow-primary-500/20">
+                        <Icons.Car />
+                    </div>
+                    <span className="font-bold text-lg text-slate-800 tracking-tight hidden md:block">Service<span className="text-primary-600">Pro</span></span>
+                </div>
+                <nav className="hidden md:flex bg-slate-100/50 p-1 rounded-xl">
+                {navItems.map((item) => (
+                    <button key={item.id} onClick={() => setPage(item.id)} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${ page === item.id ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/50'}`}>
+                        <item.icon /> {item.name}
+                    </button>
+                ))}
+                </nav>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-slate-800">{user.hoTen || user.userId}</p>
+                <div className="flex items-center justify-end gap-1">
+                    <span className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-purple-500' : 'bg-green-500'}`}></span>
+                    <p className="text-xs text-slate-500">{isAdmin ? 'Quản lý' : 'Khách hàng'}</p>
+                </div>
+              </div>
+              <button onClick={onLogout} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Đăng xuất">
+                <Icons.Logout />
+              </button>
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // --- LEGEND & FILTER ---
+    function StatusLegend() {
+      return (
+        <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200">
+          <h3 className="mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Trạng thái</h3>
+          <div className="flex flex-wrap gap-2">
+            {Object.values(STATUSES).map((status) => (
+              <span key={status.text} className={`px-2 py-1 rounded-md text-xs font-medium border ${status.color} ${status.textColor} bg-opacity-50`}>
+                {status.text}
+              </span>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    function FilterBar({ filterDate, onDateChange, filterStatus, onStatusChange, onResetFilters }) {
+      return (
+        <div className="flex flex-wrap items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-200">
+          <div className="flex items-center gap-2">
+            <span className="p-2 bg-slate-100 rounded-lg text-slate-500"><Icons.Calendar /></span>
+            <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400">Ngày làm việc</label>
+                <input type="date" value={filterDate} onChange={(e) => onDateChange(e.target.value)} className="bg-transparent text-sm font-medium text-slate-700 outline-none" />
+            </div>
+          </div>
+          <div className="h-8 w-px bg-slate-200"></div>
+          <div className="flex items-center gap-2">
+            <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400">Lọc trạng thái</label>
+                <select value={filterStatus} onChange={(e) => onStatusChange(e.target.value)} className="bg-transparent text-sm font-medium text-slate-700 outline-none pr-8">
+                    <option value="">Tất cả</option>
+                    {Object.keys(STATUSES).map((key) => (<option key={key} value={key}>{STATUSES[key].text}</option>))}
+                </select>
+            </div>
+          </div>
+          <div className="ml-auto">
+             <button onClick={onResetFilters} className="px-3 py-1.5 text-xs font-medium text-slate-500 bg-slate-100 rounded-lg hover:bg-slate-200 transition">Mặc định</button>
+          </div>
+        </div>
+      );
+    }
+    
+    // --- TIMELINE VIEW (ĐÃ NÂNG CẤP UI) ---
+    function TimelineView({ tasks, user, onEditTask, onDeleteTask, filterDate, filterStatus }) {
+      const startTime = 7, endTime = 22, totalHours = endTime - startTime, columnsPerHour = 4, totalColumns = totalHours * columnsPerHour;
+      
+      const timeToGridColumn = (time) => {
+        if (!time) return 1; const hour = time.getHours(), minute = time.getMinutes(), startMinutes = (startTime * 60), timeMinutes = (hour * 60) + minute, minutesDiff = timeMinutes - startMinutes, col = Math.floor(minutesDiff / 15) + 1;
+        if (col < 1) return 1; if (col > totalColumns + 1) return totalColumns + 1; return col;
+      };
+      const getGridSpan = (startDate, endDate) => {
+        const startCol = timeToGridColumn(startDate); let endCol;
+        if (endDate) { endCol = timeToGridColumn(endDate); } else { endCol = startCol + 2; }
+        if (endCol <= startCol) endCol = startCol + 1;
+        return { gridColumnStart: startCol, gridColumnEnd: endCol };
+      };
+      
+      const renderTasksForBay = (bayId) => {
+        const tasksForDayAndBay = tasks.filter(task => {
+          if (task.bayId !== bayId) return false;
+          if (!task.startTime) return false;
+          if (task.startTime.toISOString().split('T')[0] !== filterDate) return false;
+          if (task.paymentStatus === 'paid') return false;
+          if (filterStatus && task.status !== filterStatus) return false;
+          return true;
+        });
+        
+        return tasksForDayAndBay.map(task => {
+          const style = getGridSpan(task.startTime, task.endTime);
+          const statusInfo = STATUSES[task.status] || STATUSES['cho_sua_chua'];
+          const isAdmin = user.role === 'admin';
+          const isOwner = String(task.userId) === String(user.userId);
+          
+          return (
+            <div key={task.id} 
+                className={`relative flex flex-col p-2.5 rounded-xl border shadow-sm hover:shadow-md transition-all group ${statusInfo.color} ${statusInfo.textColor}`} 
+                style={{ ...style, zIndex: 10, minHeight: '68px' }}>
+              <div className="flex-grow overflow-hidden">
+                <p className="text-xs font-extrabold truncate opacity-90">{task.licensePlate}</p>
+                <p className="text-[10px] font-medium truncate opacity-75">{task.customerName}</p>
+              </div>
+              {(isAdmin || (isOwner && isToday(task.startTime))) && (
+                <div className="absolute top-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/40 p-0.5 rounded-md backdrop-blur-sm">
+                  <button onClick={() => onEditTask(task)} className="p-1 hover:text-blue-700 rounded"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                  <button onClick={() => onDeleteTask(task.id, user.role === 'admin')} className="p-1 hover:text-red-700 rounded"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                </div>
+              )}
+            </div>
+          );
+        });
+      };
+      
+      return (
+        <div className="p-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto custom-scrollbar pb-2">
+            <div className="relative min-w-[1600px] bg-slate-50/50" style={{ display: 'grid', gridTemplateColumns: `160px repeat(${totalColumns}, 1fr)`, gridAutoRows: 'minmax(80px, auto)', gap: '1px' }}>
+                {/* Header Time */}
+                <div className="sticky top-0 z-20 bg-white border-b border-slate-200 col-span-full grid grid-cols-subgrid shadow-sm" style={{ gridColumn: `2 / span ${totalColumns}` }}>
+                    {Array.from({length: totalHours}).map((_, i) => (
+                        <div key={i} className="text-xs font-semibold text-center text-slate-400 py-2 border-r border-slate-100 last:border-0" style={{ gridColumn: `span ${columnsPerHour}` }}>{startTime + i}:00</div>
+                    ))}
+                </div>
+                
+                {/* Grid Lines Overlay */}
+                <div className="absolute inset-0 pointer-events-none z-0 grid grid-cols-subgrid" style={{ gridTemplateColumns: `160px repeat(${totalColumns}, 1fr)` }}>
+                     <div className="col-start-2 col-span-full grid grid-cols-subgrid h-full">
+                        {Array.from({length: totalColumns}).map((_, i) => (
+                            <div key={i} className={`h-full border-l ${ (i) % 4 === 0 ? 'border-slate-200' : 'border-slate-100/60'}`}></div>
+                        ))}
+                     </div>
+                </div>
+
+                {BAYS_TECHNICIANS.map((bay, index) => (
+                <React.Fragment key={bay.id}>
+                    <div className="sticky left-0 z-10 bg-white border-r border-b border-slate-200 p-3 flex flex-col justify-center" style={{ gridRow: index + 2 }}>
+                        <div className="font-bold text-slate-700 text-sm">{bay.name}</div>
+                        <div className="text-xs text-slate-500 font-medium">{bay.technician}</div>
+                    </div>
+                    <div className="relative z-10 grid col-span-full grid-cols-subgrid border-b border-slate-100 bg-white" style={{ gridRow: index + 2, gridColumn: `2 / span ${totalColumns}`, padding: '4px 0' }}>
+                        {renderTasksForBay(bay.id)}
+                    </div>
+                </React.Fragment>
+                ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // --- BẢNG LỊCH HẸN ---
+    function AppointmentListView({ tasks, user, onEditTask, onDeleteTask, onRequestPayment, onAdminConfirmPayment, findUserHoTen }) {
+      const [filterDate, setFilterDate] = useState(getTodayString());
+      const isAdmin = user.role === 'admin';
+      
+      const filteredTasks = useMemo(() => {
+        return tasks.filter(task => {
+            if (!task.startTime) return false;
+            const isNotPaid = task.paymentStatus !== 'paid';
+            // Không lọc theo ngày nữa nếu là task cũ (chỉ cần chưa thanh toán)
+            // Tuy nhiên, để tránh tải quá nhiều, vẫn giữ lọc theo ngày, 
+            // nhưng nhân viên có thể yêu cầu thanh toán cho task cũ.
+            return task.startTime.toISOString().split('T')[0] === filterDate && isNotPaid;
+          }).sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+      }, [tasks, filterDate]);
+      
+      return (
+        <div className="space-y-4">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Icons.Calendar /> Lịch Hẹn</h2>
+                <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-primary-500"/>
+            </div>
+            
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-100">
+                    <thead className="bg-slate-50">
+                        <tr>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Xe & Khách</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider bg-amber-50/50">Thanh toán</th>
+                        {isAdmin && (
+                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider bg-amber-50/50">NV Yêu cầu</th> 
+                        )}
+                        <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Tác vụ</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                        {filteredTasks.map((task) => {
+                        const statusInfo = STATUSES[task.status] || STATUSES['cho_sua_chua'];
+                        const isPending = task.paymentStatus === 'pending';
+                        const isDeleteRequested = task.deletionStatus === 'requested';
+                        const paymentRequester = task.paymentRequesterId ? findUserHoTen(task.paymentRequesterId) : 'N/A'; // Lấy tên người yêu cầu
+                        
+                        return (
+                            <tr key={task.id} className="hover:bg-slate-50/80 transition-colors group">
+                            <td className="px-6 py-4">
+                                <div className="text-sm font-bold text-primary-700">{task.licensePlate}</div>
+                                <div className="text-xs text-slate-500">{task.customerName}</div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-600">
+                                <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> {formatDateTimeVN(task.startTime).split(' ')[1]}</div>
+                                <div className="flex items-center gap-1.5 mt-1 opacity-70"><span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span> {formatDateTimeVN(task.endTime).split(' ')[1]}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusInfo.color} ${statusInfo.textColor} bg-opacity-50`}>
+                                {statusInfo.text}
+                                </span>
+                            </td>
+                            <td className="px-6 py-4 bg-amber-50/30">
+                                {isPending ? (
+                                    isAdmin ? 
+                                        <button onClick={()=>onAdminConfirmPayment(task)} className="px-3 py-1 bg-amber-500 text-white rounded-md text-xs font-bold shadow-md shadow-amber-500/30 animate-pulse-fast hover:bg-amber-600">Duyệt TT</button> 
+                                        : <span className="text-amber-500 text-xs font-medium italic flex items-center gap-1">Chờ Admin duyệt...</span>
+                                ) : (
+                                    isAdmin ? 
+                                        <button onClick={()=>onAdminConfirmPayment(task)} className="text-emerald-600 hover:text-emerald-700 text-xs font-bold border border-emerald-200 px-2 py-1 rounded hover:bg-emerald-50 transition">Thu tiền</button> 
+                                        : <button onClick={()=>onRequestPayment(task)} className="text-primary-600 hover:text-primary-800 text-xs font-medium hover:underline">Yêu cầu TT</button>
+                                )}
+                            </td>
+                            {isAdmin && (
+                                <td className={`px-6 py-4 text-xs ${isPending ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-500'}`}>
+                                    {paymentRequester}
+                                </td>
+                            )}
+                            <td className="px-6 py-4 text-right space-x-2">
+                                {/* Quyền Sửa: Chỉ Admin hoặc Chủ task & Today */}
+                                {(isAdmin || (String(task.userId) === String(user.userId) && isToday(task.startTime))) && (
+                                    <button onClick={() => onEditTask(task)} className="text-slate-400 hover:text-primary-600 transition font-medium text-xs">Sửa</button>
+                                )}
+                                {/* Quyền Xóa: Khác với Quyền Sửa */}
+                                {isDeleteRequested ? (
+                                    isAdmin ? 
+                                        <button onClick={()=>onDeleteTask(task.id, true)} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-bold shadow hover:bg-red-600">Duyệt Xóa</button> 
+                                        : <span className="text-red-400 text-xs italic">Chờ xóa</span>
+                                ) : (
+                                    (isAdmin || (String(task.userId) === String(user.userId) && isToday(task.startTime))) && (
+                                        <button onClick={()=>onDeleteTask(task.id, false)} className="text-slate-400 hover:text-red-600 transition font-medium text-xs">
+                                            {isAdmin ? 'Xóa' : 'Yêu cầu xóa'}
+                                        </button>
+                                    )
+                                )}
+                            </td>
+                            </tr>
+                        );
+                        })}
+                    </tbody>
+                    </table>
+                    {filteredTasks.length === 0 && <div className="p-8 text-center text-slate-400">Không có lịch hẹn nào chưa thanh toán trong ngày này.</div>}
+                </div>
+            </div>
+        </div>
+      );
+    }
+    
+    // --- QUẢN LÝ NHÂN VIÊN ---
+    function AdminUsersPage({ users, loading, error }) {
+      
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 animate-fade-in">
+          <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Icons.Users /> Danh sách Nhân sự</h2>
+          {loading ? <div className="text-center py-8 text-slate-500">Đang tải...</div> : 
+           error ? <div className="text-red-500">{error}</div> : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">User ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Họ tên</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Vai trò</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Liên hệ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {users.map((u) => (
+                    <tr key={u.userId} className="hover:bg-slate-50">
+                      <td className="px-6 py-4 text-sm font-medium text-slate-800">{u.userId}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{u.hoTen}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>{u.role}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-500">
+                        <div>{u.sdt}</div>
+                        <div className="text-xs opacity-75">{u.gmail}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // --- TRANG BÁO CÁO ---
+    function AdminReportPage({ user }) {
+      const [reportData, setReportData] = useState([]);
+      const [totalRevenue, setTotalRevenue] = useState(0);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+      const [date, setDate] = useState(getTodayString());
+
+      const fetchReport = useCallback(() => {
+        setLoading(true); setError('');
+        fetch(`${API_URL}/api/report?userId=${user.userId}&date=${date}`)
+          .then(res => res.json().then(data => ({ status: res.status, body: data })))
+          .then(({ status, body }) => {
+            if (status === 200) { setReportData(body.tasks || []); setTotalRevenue(body.totalRevenue || 0); } 
+            else setError(body.error);
+          })
+          .catch(err => setError('Lỗi kết nối'))
+          .finally(() => setLoading(false));
+      }, [user.userId, date]);
+      
+      useEffect(() => { fetchReport(); }, [fetchReport]);
+
+      return (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex flex-wrap gap-4 items-stretch">
+             <div className="flex-1 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><Icons.Chart /> Báo cáo Doanh thu</h2>
+                <div className="flex gap-2">
+                    <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"/>
+                    <button onClick={fetchReport} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-bold shadow-md shadow-primary-500/20 hover:bg-primary-700 transition">Xem</button>
+                </div>
+             </div>
+             <div className="flex-1 bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-xl shadow-lg shadow-emerald-500/20 text-white flex flex-col justify-center">
+                <div className="text-emerald-100 text-sm font-medium uppercase tracking-wide">Tổng doanh thu ngày</div>
+                <div className="text-3xl font-extrabold mt-1">{formatCurrency(totalRevenue)}</div>
+             </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+             <div className="px-6 py-4 border-b border-slate-100 text-sm text-slate-500">Tìm thấy <strong className="text-slate-800">{reportData.length}</strong> giao dịch.</div>
+             {loading ? <div className="p-8 text-center text-slate-500">Đang tải dữ liệu...</div> : 
+              error ? <div className="p-8 text-center text-red-500">{error}</div> : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-100">
+                  <thead className="bg-slate-50/50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Biển số</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Khách hàng</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Thời gian</th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Dịch vụ</th>
+                      <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase bg-emerald-50/30">Doanh thu</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {reportData.map((task) => (
+                      <tr key={task.id} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 text-sm font-bold text-slate-700">{task.licensePlate}</td>
+                        <td className="px-6 py-4 text-sm text-slate-600">{task.customerName}</td>
+                        <td className="px-6 py-4 text-xs text-slate-500">
+                           {formatDateTimeVN(task.startTime).split(' ')[1]} - {formatDateTimeVN(task.endTime).split(' ')[1]}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-600">{task.serviceDetails}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-emerald-600 text-right bg-emerald-50/30">{formatCurrency(task.revenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+             )}
+          </div>
+        </div>
+      );
+    }
+    
+    // --- DASHBOARD CONTAINER ---
+    function Dashboard({ user, onLogout }) {
+      const [page, setPage] = useState('timeline');
+      const [tasks, setTasks] = useState([]);
+      const [users, setUsers] = useState([]); // NEW: State để lưu danh sách users
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [isEditMode, setIsEditMode] = useState(false);
+      const [taskToEdit, setTaskToEdit] = useState(null);
+      const [isPayModalOpen, setPayModalOpen] = useState(false);
+      const [payTask, setPayTask] = useState(null);
+      
+      const [timelineDate, setTimelineDate] = useState(getTodayString());
+      const [timelineStatus, setTimelineStatus] = useState('');
+
+      const fetchTasks = useCallback(() => {
+        setLoading(true);
+        fetch(`${API_URL}/api/tasks`)
+          .then(res => res.json().then(data => ({ status: res.status, body: data })))
+          .then(({ status, body }) => {
+            if (status === 200) {
+              setTasks(body.map(task => ({
+                ...task, startTime: task.startTime ? new Date(task.startTime) : null, endTime: task.endTime ? new Date(task.endTime) : null,
+              })));
+              setError(null);
+            } else setError(body.error);
+          })
+          .catch(err => setError(err.message))
+          .finally(() => setLoading(false));
+      }, []);
+
+      // NEW: Hàm fetch users (chỉ cho Admin hoặc để tra cứu tên)
+      const fetchUsers = useCallback(() => {
+        // Chỉ fetch nếu đang ở Dashboard (có currentUser)
+        if (user) {
+            fetch(`${API_URL}/api/users?userId=${user.userId}`)
+                .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                .then(({ status, body }) => {
+                    if (status === 200) setUsers(body);
+                    // Không set error lớn nếu fetch users lỗi, chỉ dùng để tra cứu
+                })
+                .catch(() => {});
+        }
+      }, [user]);
+
+      useEffect(() => { 
+          fetchTasks(); 
+          fetchUsers(); // Fetch users khi component mount
+      }, [fetchTasks, fetchUsers]);
+      
+      // NEW: Hàm tra cứu tên nhân viên
+      const findUserHoTen = useCallback((userId) => {
+        const foundUser = users.find(u => String(u.userId) === String(userId));
+        return foundUser ? foundUser.hoTen || foundUser.userId : userId; // Ưu tiên Họ tên
+      }, [users]);
+
+      // CRUD Handlers (Logic không đổi)
+      const handleTaskCreated = (newTask) => { setTasks(prev => [...prev, { ...newTask, startTime: newTask.startTime ? new Date(newTask.startTime) : null, endTime: newTask.endTime ? new Date(newTask.endTime) : null }]); };
+      // Cập nhật handleTaskUpdated để đảm bảo trả về object Date nếu có
+      const handleTaskUpdated = (updatedTask) => { setTasks(prev => prev.map(task => task.id === updatedTask.id ? { ...task, ...updatedTask, startTime: updatedTask.startTime ? new Date(updatedTask.startTime) : null, endTime: updatedTask.endTime ? new Date(updatedTask.endTime) : null } : task)); setTaskToEdit(null); setIsEditMode(false); };
+      
+      const handleDeleteTask = (taskId, isAdminConfirm) => {
+        if (isAdminConfirm) {
+            if (!confirm('XÓA VĨNH VIỄN công việc này?')) return;
+            fetch(`${API_URL}/api/tasks/${taskId}?userId=${user.userId}&role=${user.role}`, { method: 'DELETE' })
+            .then(res => res.json().then(d => d.status === 200 ? setTasks(p => p.filter(t => t.id !== taskId)) : alert(d.body.error)));
+        } else {
+            if (user.role === 'admin') {
+                 if (!confirm('Xóa công việc này?')) return;
+                 fetch(`${API_URL}/api/tasks/${taskId}?userId=${user.userId}&role=${user.role}`, { method: 'DELETE' }).then(res => res.json().then(d => d.status === 200 ? setTasks(p => p.filter(t => t.id !== taskId)) : alert(d.body.error)));
+            } else {
+                if (!confirm('Gửi yêu cầu xóa cho Admin?')) return;
+                fetch(`${API_URL}/api/tasks/${taskId}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isDeleteRequest: true, deletionStatus: 'requested', currentUserId: user.userId, currentUserRole: user.role }) }).then(r=>r.json()).then(b=>b.data ? handleTaskUpdated(b.data) : alert(b.error));
+            }
+        }
+      };
+      const handleRequestPayment = (task) => {
+          if(!confirm(`Yêu cầu thanh toán xe ${task.licensePlate}?`)) return;
+          // **Bổ sung paymentRequesterId**
+          fetch(`${API_URL}/api/tasks/${task.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ isPaymentRequest: true, paymentStatus: 'pending', currentUserId: user.userId, currentUserRole: user.role, paymentRequesterId: user.userId }) }).then(r=>r.json()).then(b=>b.data ? (handleTaskUpdated(b.data), alert("Đã gửi yêu cầu!")) : alert(b.error));
+      };
+      const openAdminPayModal = (task) => { setPayTask(task); setPayModalOpen(true); };
+      const confirmPayment = (taskId, amount) => {
+          fetch(`${API_URL}/api/tasks/${taskId}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ paymentStatus: 'paid', revenue: amount, currentUserId: user.userId, currentUserRole: user.role }) }).then(r=>r.json()).then(b=>b.data ? (handleTaskUpdated(b.data), setPayModalOpen(false), setPayTask(null)) : alert(b.error));
+      };
+      
+      const renderPage = () => {
+        if (loading) return <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div></div>;
+        if (error) return <div className="p-6 text-center text-red-600 bg-red-50 rounded-xl m-6">Hệ thống gặp sự cố: {error}</div>;
+        switch (page) {
+          case 'timeline': return <TimelineView tasks={tasks} user={user} onEditTask={(t)=>{setIsEditMode(true);setTaskToEdit(t);setIsModalOpen(true)}} onDeleteTask={(id)=>handleDeleteTask(id, false)} filterDate={timelineDate} filterStatus={timelineStatus} />;
+          // Truyền findUserHoTen xuống AppointmentListView
+          case 'appointments': return <AppointmentListView tasks={tasks} user={user} onEditTask={(t)=>{setIsEditMode(true);setTaskToEdit(t);setIsModalOpen(true)}} onDeleteTask={handleDeleteTask} onRequestPayment={handleRequestPayment} onAdminConfirmPayment={openAdminPayModal} findUserHoTen={findUserHoTen} />;
+          case 'history': return <AdminHistoryPage user={user} />;
+          // Truyền users data và loading/error xuống AdminUsersPage
+          case 'staff': return <AdminUsersPage users={users} loading={loading} error={error} />;
+          case 'reports': return <AdminReportPage user={user} />;
+          default: return null;
+        }
+      };
+
+      return (
+        <div className="flex flex-col min-h-screen">
+          <AppHeader user={user} onLogout={onLogout} page={page} setPage={setPage} />
+          
+          <main className="flex-grow w-full px-4 py-6 mx-auto max-w-screen-2xl sm:px-6 lg:px-8 space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div>
+                    <h1 className="text-xl font-bold text-slate-800">Tổng quan công việc</h1>
+                    <p className="text-sm text-slate-500">Quản lý tiến độ và dịch vụ hôm nay</p>
+                </div>
+                <button onClick={() => {setIsEditMode(false);setTaskToEdit(null);setIsModalOpen(true)}} className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-lg font-bold shadow-lg shadow-primary-500/30 hover:bg-primary-700 hover:-translate-y-0.5 transition-all">
+                    <Icons.Plus /> Tạo Lịch Hẹn
+                </button>
+            </div>
+            
+            {page === 'timeline' && (
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                  <div className="lg:col-span-2"><FilterBar filterDate={timelineDate} onDateChange={setTimelineDate} filterStatus={timelineStatus} onStatusChange={setTimelineStatus} onResetFilters={()=>{setTimelineDate(getTodayString());setTimelineStatus('')}} /></div>
+                  <div className="lg:col-span-1"><StatusLegend /></div>
+                </div>
+            )}
+            
+            {renderPage()}
+          </main>
+          
+          <TaskModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} user={user} onTaskCreated={handleTaskCreated} onTaskUpdated={handleTaskUpdated} isEditMode={isEditMode} taskToEdit={taskToEdit} />
+          <PaymentModal isOpen={isPayModalOpen} onClose={() => setPayModalOpen(false)} task={payTask} onConfirm={confirmPayment} />
+        </div>
+      );
+    }
+    
+    // --- APP ROOT ---
+    function App() {
+      const [currentUser, setCurrentUser] = useState(null);
+      const [view, setView] = useState('login'); 
+
+      useEffect(() => {
+        try { const storedUser = localStorage.getItem('serviceAppUser'); if (storedUser) { setCurrentUser(JSON.parse(storedUser)); setView('dashboard'); }
+        } catch (e) { localStorage.removeItem('serviceAppUser'); }
+      }, []);
+      
+      const handleLogin = (user) => { setCurrentUser(user); localStorage.setItem('serviceAppUser', JSON.stringify(user)); setView('dashboard'); };
+      const handleRegister = (user) => { alert('Đăng ký thành công!'); setCurrentUser(user); localStorage.setItem('serviceAppUser', JSON.stringify(user)); setView('dashboard'); };
+      const handleLogout = () => { setCurrentUser(null); localStorage.removeItem('serviceAppUser'); setView('login'); };
+
+      if (view === 'login') return <LoginPage onLoginSuccess={handleLogin} onSwitchToRegister={() => setView('register')} />;
+      if (view === 'register') return <RegisterPage onRegisterSuccess={handleRegister} onSwitchToLogin={() => setView('login')} />;
+      if (view === 'dashboard' && currentUser) return <Dashboard user={currentUser} onLogout={handleLogout} />;
+      return <LoginPage onLoginSuccess={handleLogin} onSwitchToRegister={() => setView('register')} />;
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+
+  </script>
+</body>
+</html>
+
+<!-- https://docs.google.com/spreadsheets/d/1vIDd9BO4fFIZAVhD0XNu6UHqTuSG_kjhjpK-vCoSkj4/edit?gid=0#gid=0 -->
