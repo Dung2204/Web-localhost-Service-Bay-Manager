@@ -8,10 +8,10 @@ from oauth2client.service_account import ServiceAccountCredentials
 import os
 import traceback # Để in lỗi chi tiết
 import re # Thêm thư viện Regex để xử lý task_XX
+import json # THÊM: Cần thiết để xử lý chuỗi JSON từ biến môi trường
 
 # --- Lấy đường dẫn thư mục hiện tại của tệp App.py ---
-# Điều này đảm bảo code tìm đúng tệp credentials.json và index.html
-# ngay cả khi bạn chạy python từ thư mục khác
+# Điều này đảm bảo code tìm đúng tệp index.html
 script_dir = os.path.abspath(os.path.dirname(__file__))
 print(f">>> Thư mục gốc của script: {script_dir}")
 
@@ -21,7 +21,7 @@ app = Flask(__name__, template_folder=script_dir)
 CORS(app) # Cho phép React (chạy trên trình duyệt) gọi API này
 
 # --- Cấu hình Google Sheets ---
-CREDENTIALS_FILE = os.path.join(script_dir, "credentials.json")
+# KHÔNG DÙNG CREDENTIALS_FILE NỮA ĐỂ KHẮC PHỤC LỖI RENDER
 SHEET_NAME = "ServiceAppDB"
 
 # Biến toàn cục cho 2 tab
@@ -44,30 +44,35 @@ BAYS_TECHNICIANS_LIST = [
 # Tạo danh sách ID theo thứ tự để quay vòng
 BAY_IDS_ORDER = [bay['id'] for bay in BAYS_TECHNICIANS_LIST]
 
-try:
-    if not os.path.exists(CREDENTIALS_FILE):
-        print(f"LỖI: Không tìm thấy tệp '{CREDENTIALS_FILE}'.")
-        print("Hãy chắc chắn bạn đã tải về tệp JSON từ Google Cloud, đổi tên thành 'credentials.json' và đặt nó vào cùng thư mục với App.py.")
-    else:
-        scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
-        client = gspread.authorize(creds)
 
+# KHỐI KẾT NỐI MỚI: ĐỌC TỪ BIẾN MÔI TRƯỜNG 'GOOGLE_SHEETS_CREDENTIALS'
+try:
+    # 1. Đọc nội dung JSON từ Biến Môi Trường Render
+    credentials_json_str = os.environ.get('GOOGLE_SHEETS_CREDENTIALS')
+    
+    if credentials_json_str:
+        # 2. Chuyển chuỗi JSON thành dictionary
+        creds_dict = json.loads(credentials_json_str)
+        
+        scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
+        # 3. Tạo đối tượng Credentials trực tiếp từ dictionary
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        
         # Mở cả 2 tab bằng tên
-        # Tab đầu tiên thường là sheet1 (mặc định)
         sheet_tasks = client.open(SHEET_NAME).sheet1
-        # Mở tab thứ hai bằng tên bạn đã đặt
-        sheet_users = client.open(SHEET_NAME).worksheet("Users") # Đảm bảo tên "Users" viết hoa đúng
+        sheet_users = client.open(SHEET_NAME).worksheet("Users") 
 
         print(f">>> Đã kết nối 2 tab 'Tasks' ({sheet_tasks.title}) và 'Users' ({sheet_users.title}) của '{SHEET_NAME}' thành công!")
 
-        # --- [UPDATE] TỰ ĐỘNG THÊM CỘT: paymentStatus, revenue, deletionStatus ---
+        # --- TỰ ĐỘNG THÊM CỘT: paymentStatus, revenue, deletionStatus, paymentRequesterId ---
         try:
             current_headers = sheet_tasks.row_values(1)
             new_columns_needed = []
             if 'paymentStatus' not in current_headers: new_columns_needed.append('paymentStatus')
             if 'revenue' not in current_headers: new_columns_needed.append('revenue')
-            if 'deletionStatus' not in current_headers: new_columns_needed.append('deletionStatus') # Cột cho quy trình xóa
+            if 'deletionStatus' not in current_headers: new_columns_needed.append('deletionStatus')
+            if 'paymentRequesterId' not in current_headers: new_columns_needed.append('paymentRequesterId') 
             
             if new_columns_needed:
                 print(f">>> Đang tự động thêm cột mới {new_columns_needed} vào Google Sheet Tasks...")
@@ -79,17 +84,22 @@ try:
             print(f"Cảnh báo: Không thể kiểm tra cột mới: {e}")
         # ----------------------------------------------------------------------
 
+    else:
+        print("LỖI: Biến môi trường 'GOOGLE_SHEETS_CREDENTIALS' không được tìm thấy. Không thể kết nối Google Sheets.")
+        sheet_tasks = None 
+        sheet_users = None
+
 except gspread.exceptions.WorksheetNotFound:
     print(f"LỖI: Không tìm thấy tab 'Users' trong Google Sheet '{SHEET_NAME}'. Hãy kiểm tra lại tên tab.")
-    sheet_tasks = None # Đặt lại để biết lỗi
+    sheet_tasks = None 
     sheet_users = None
 except Exception as e:
     print(f"LỖI: Không thể kết nối Google Sheets.")
-    print(f"Hãy kiểm tra 1) Tệp '{CREDENTIALS_FILE}' có hợp lệ không, 2) Tên Sheet '{SHEET_NAME}' có đúng không, 3) Bạn đã 'Share' Sheet cho email trong credentials chưa, 4) API Google Sheets/Drive đã bật chưa.")
     print(f"Lỗi chi tiết: {e}")
     traceback.print_exc()
     sheet_tasks = None
     sheet_users = None
+
 
 # --- HÀM HỖ TRỢ (PHẢI ĐỊNH NGHĨA TRƯỚC KHI SỬ DỤNG) ---
 
@@ -379,6 +389,7 @@ def get_tasks():
             if 'paymentStatus' not in task_data: task_data['paymentStatus'] = 'unpaid'
             if 'revenue' not in task_data: task_data['revenue'] = 0
             if 'deletionStatus' not in task_data: task_data['deletionStatus'] = 'none'
+            if 'paymentRequesterId' not in task_data: task_data['paymentRequesterId'] = ''
             
             tasks.append(task_data)
 
@@ -416,6 +427,7 @@ def add_task():
         new_row_dict['paymentStatus'] = 'unpaid'
         new_row_dict['revenue'] = 0
         new_row_dict['deletionStatus'] = 'none'
+        new_row_dict['paymentRequesterId'] = '' # Mặc định rỗng
 
         # Xử lý ngày tháng startTime và endTime (ghi dưới dạng ISO có dấu ' để ép text)
         for key in ['startTime', 'endTime']:
@@ -443,6 +455,7 @@ def add_task():
         new_task_data_for_client['paymentStatus'] = 'unpaid'
         new_task_data_for_client['revenue'] = 0
         new_task_data_for_client['deletionStatus'] = 'none'
+        new_task_data_for_client['paymentRequesterId'] = ''
         # startTime/endTime đã là ISO từ client, giữ nguyên
         return jsonify(new_task_data_for_client), 201
 
@@ -491,7 +504,6 @@ def update_task(task_id):
 
     is_admin = user_role == 'admin'
     # So sánh ID dạng chuỗi
-    # So sánh ID dạng chuỗi
     is_owner = str(task_owner_id).strip() == str(user_id).strip()
     is_task_today = is_today(task_start_time_str) # Kiểm tra ngày của task
 
@@ -507,7 +519,6 @@ def update_task(task_id):
     # Cho phép Admin (toàn quyền)
     # HOẶC Chủ xe (trong ngày) (sửa thông tin chính)
     # HOẶC BẤT KỲ user nào đang yêu cầu thanh toán/xóa (logic này xử lý trạng thái 'pending'/'requested')
-    # Thêm điều kiện: is_payment_request is True and not is_admin (để user thường được set 'pending')
     
     can_request_payment = is_payment_request and not is_admin # Bất kỳ user nào (không phải admin) đang gửi yêu cầu TT
     can_request_delete = is_delete_request and not is_admin # Bất kỳ user nào (không phải admin) đang gửi yêu cầu xóa
@@ -545,6 +556,18 @@ def update_task(task_id):
                     # Các trường khác ghi bình thường
                     new_value_for_sheet = new_value
                     updated_data_for_client[header] = new_value # Cập nhật cho client
+                    
+                # BỔ SUNG LOGIC LƯU paymentRequesterId 
+                if header == 'paymentRequesterId':
+                    # Nếu là thanh toán thành công, đặt requesterId về rỗng để reset trạng thái yêu cầu
+                    if data.get('paymentStatus') == 'paid':
+                        new_value_for_sheet = ''
+                        updated_data_for_client[header] = ''
+                    # Nếu là yêu cầu thanh toán, lưu ID người gửi
+                    elif data.get('isPaymentRequest') and data.get('paymentStatus') == 'pending':
+                         new_value_for_sheet = data.get('currentUserId')
+                         updated_data_for_client[header] = data.get('currentUserId')
+
 
                 # Tạo đối tượng Cell để cập nhật hàng loạt
                 update_cells_list.append(gspread.Cell(row_number, i + 1, new_value_for_sheet))
@@ -605,20 +628,18 @@ def delete_task(task_id):
         traceback.print_exc()
         return jsonify({"error": f"Lỗi máy chủ khi xóa công việc: {e}"}), 500
 
-# --- API ADMIN ---
+# --- API ADMIN/USERS (Đã sửa để cho phép mọi user đọc) ---
 
 @app.route('/api/users', methods=['GET'])
 def get_users():
-    """(Chỉ Admin) Lấy danh sách user"""
+    """(Admin/Client) Lấy danh sách user - Cho phép mọi user đọc để tra cứu tên"""
     if not sheet_users: return jsonify({"error": "Máy chủ chưa kết nối được với Google Sheet (Users)"}), 500
-    print("\n[API] GET /api/users (Admin). Đang đọc tab Users...")
+    print("\n[API] GET /api/users. Đang đọc tab Users...")
 
-    # Kiểm tra quyền Admin (lấy userId từ query param)
+    # YÊU CẦU PHẢI CÓ USER ID ĐỂ BẢO MẬT CƠ BẢN
     user_id = request.args.get('userId')
-    user = find_user(user_id) # Tìm thông tin user yêu cầu trong DB
-    if not user or user.get('role') != 'admin':
-        print(f"[API] /api/users BỊ TỪ CHỐI. User yêu cầu: '{user_id}' không phải admin.")
-        return jsonify({"error": "Truy cập bị từ chối. Cần quyền Admin."}), 403
+    if not user_id:
+        return jsonify({"error": "Yêu cầu thiếu thông tin userId"}), 401
 
     try:
         users = sheet_users.get_all_records()
@@ -773,7 +794,7 @@ if __name__ == '__main__':
     print("-----------------------------------------------------")
     print(">>> Máy chủ Python Flask (v3.2 - Auto-Create Admin) đang khởi động...")
     print(f">>> Thư mục gốc: {script_dir}")
-    print(f">>> Tệp Credentials: {CREDENTIALS_FILE}")
+    print(">>> Tệp Credentials: Đọc từ Biến Môi Trường Render")
     print(f">>> Tệp Template (index.html): {script_dir}")
     print(">>>")
     if sheet_tasks and sheet_users:
