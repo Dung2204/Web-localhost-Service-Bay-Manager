@@ -8,20 +8,18 @@ from oauth2client.service_account import ServiceAccountCredentials
 import os
 import traceback # Để in lỗi chi tiết
 import re # Thêm thư viện Regex để xử lý task_XX
-import json # THÊM: Cần thiết để xử lý chuỗi JSON từ biến môi trường
+import json # [FIX]: THÊM import này để xử lý biến môi trường JSON
 
-# --- Lấy đường dẫn thư mục hiện tại của tệp App.py ---
-# Điều này đảm bảo code tìm đúng tệp index.html
+# --- Lấy đường dẫn thư mục hiện tại của tệp app.py ---
 script_dir = os.path.abspath(os.path.dirname(__file__))
 print(f">>> Thư mục gốc của script: {script_dir}")
 
 # --- Cấu hình Flask ---
-# template_folder=script_dir nói với Flask tìm tệp index.html trong cùng thư mục với App.py
 app = Flask(__name__, template_folder=script_dir)
-CORS(app) # Cho phép React (chạy trên trình duyệt) gọi API này
+CORS(app) 
 
 # --- Cấu hình Google Sheets ---
-# KHÔNG DÙNG CREDENTIALS_FILE NỮA ĐỂ KHẮC PHỤC LỖI RENDER
+# KHÔNG DÙNG CREDENTIALS_FILE NỮA, SẼ ĐỌC TỪ BIẾN MÔI TRƯỜNG
 SHEET_NAME = "ServiceAppDB"
 
 # Biến toàn cục cho 2 tab
@@ -85,6 +83,7 @@ try:
         # ----------------------------------------------------------------------
 
     else:
+        # Đây là dòng log chính xác khi biến môi trường không được tìm thấy
         print("LỖI: Biến môi trường 'GOOGLE_SHEETS_CREDENTIALS' không được tìm thấy. Không thể kết nối Google Sheets.")
         sheet_tasks = None 
         sheet_users = None
